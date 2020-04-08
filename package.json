@@ -4,7 +4,8 @@
   "description": "A discord bot for GOTWIC-MAD",
   "main": "app.js",
   "scripts": {
-    "dev": "nodemon app"
+    "dev": "nodemon app",
+    "start": "node app"
   },
   "author": "CJ Canlas",
   "license": "MIT",
