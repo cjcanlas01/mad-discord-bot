@@ -5,12 +5,17 @@ const client = new Discord.Client();
 require('dotenv').config();
 // Calc module
 const calc = require('./modules/calc');
+const { GoogleSpreadsheet } = require('google-spreadsheet');
+const doc = new GoogleSpreadsheet(process.env.SPREADSHEET_ID);
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const PREFIX = "$mad";
 const botCommands = {
   HELP: 'help',
-  CALC: 'calc' 
+  CALC: 'calc',
+  PO_PREFIX: '!',
+  START_PO: 'start-po',
+  STOP_PO: 'stop-po',
 };
 
 client.on('ready', () => {
@@ -21,6 +26,45 @@ client.on('ready', () => {
 
 client.on('message', msg => {
   const msgContent = msg.content.split(" ");
+
+  if(msgContent[0].startsWith(botCommands.PO_PREFIX)) {
+    let guildData = msg.guild.member(msg.author);
+    let date = new Date(msg.createdAt);
+    let length = String(guildData.nickname).split(/\[(.*?)\]/).length;
+
+    let nickname = guildData.nickname != null ? guildData.nickname  : msg.author.username;
+    let alliance = length > 1 ? String(guildData.nickname).split(/\[(.*?)\]/)[1] : null;
+    let name = length <= 1 ? nickname : String(nickname).split(/\[(.*?)\]/)[2];
+
+    let dateformat = date.getUTCFullYear()  + "-" + (date.getUTCMonth()+1) + "-" + date.getUTCDate();
+    let timeformat = date.getUTCHours() + ":" + date.getUTCMinutes();
+
+    if(msgContent == `${botCommands.PO_PREFIX}${botCommands.START_PO}`) {
+      let data = {
+        ALLIANCE: alliance,
+        NAME: name,
+        ACTION: 'START',
+        DATE: dateformat,
+        TIME: timeformat
+      }
+      addRow(data, doc);
+      return;
+    }
+
+    if(msgContent == `${botCommands.PO_PREFIX}${botCommands.STOP_PO}`) {
+      let data = {
+        ALLIANCE: alliance,
+        NAME: name,
+        ACTION: 'STOP',
+        DATE: dateformat,
+        TIME: timeformat
+      }
+      addRow(data, doc);
+      return;
+    }
+
+    return;
+  }
 
   if(msgContent[0].startsWith(`${ PREFIX }`)) {
 
@@ -41,7 +85,6 @@ client.on('message', msg => {
         msg.channel.send(embed);
         break;
 
-
       case botCommands.CALC:
         let result = calc({
           shipped: msgContent[2],
@@ -59,5 +102,18 @@ client.on('message', msg => {
     }
   }
 });
+
+let addRow = (rowData, doc) => {
+  (async function(){
+    // await doc.useServiceAccountAuth(require('./client_secret.json'));
+    await doc.useServiceAccountAuth({
+      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    });
+    await doc.loadInfo();
+    const sheet = doc.sheetsByIndex[0]; // or use doc.sheetsById[id]
+    await sheet.addRow(rowData);
+  })(rowData, doc);
+}
 
 client.login(BOT_TOKEN);
